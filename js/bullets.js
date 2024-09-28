@@ -10,38 +10,127 @@ const BULLET = {
     REM_SPACE: -1,
     MAX_UNDERFLOW: -4
 }
-class Bullet extends React.PureComponent{
-    constructor(props){
+
+var word_freq = {}
+var popular_words = {}
+var popular_words_and_counts = []
+var notes = []
+
+function sort_dict_by_values(dict) {
+    //https://stackoverflow.com/questions/25500316/sort-a-dictionary-by-value-in-javascript    
+    // Create items array
+    var items = Object.keys(dict).map(function (key) {
+        return [key, dict[key]];
+    });
+
+    // Sort the array based on the second element
+    items.sort(function (first, second) {
+        return second[1] - first[1];
+    });
+
+    return items;
+}
+
+function update_popular_words(unsorted_dict, threshold) {
+    popular_words_and_counts = []
+    popular_words = []
+    var pop_word
+    var pop_freq
+    var sorted_dict = sort_dict_by_values(unsorted_dict)
+    for (var item of sorted_dict) {
+        pop_word = item[0]
+        pop_freq = item[1]
+        if (pop_freq < threshold) break;
+        popular_words.push(pop_word)
+        popular_words_and_counts.push([pop_word, pop_freq])
+
+    }
+}
+
+function appendColorized(text, my_div) {
+
+    my_div.appendChild(<span className={this.props.class} style={{ color: random_color }} ref={this.renderRef} >
+        {text}
+    </span >)
+}
+
+class Bullet extends React.PureComponent {
+    constructor(props) {
         super(props);
         this.renderRef = React.createRef();
     }
-    render(){
-        return(
-            <div style={{width: this.props.width, height:this.props.height}} onMouseUp={this.props.onHighlight} >
+
+    render() {
+        var blacklist = ["led", "helped"]
+        var text = ""
+        var spans = []
+        var colors = ["red", "blue"]
+        var color
+        var freq_threshold = 2
+        word_freq = {}
+        // Repopulate dictionary
+        for (const word of this.props.text.split(/[\s]+/)) {
+            if (word in word_freq) {
+                word_freq[word] += 1
+            }
+            else word_freq[word] = 1
+        }
+        //Get all words that appear more than n times  
+        update_popular_words(word_freq, freq_threshold)
+        //console.log(popular_words)
+        //Render bullets 
+        for (const word of this.props.text.split(/[\s]+/)) {
+            if (popular_words.includes(word)) {
+                color = "red"
+            }
+            else color = "black"
+            //var random_color = colors[Math.floor(Math.random() * colors.length)];
+
+            //console.log(word, my_div)
+            spans.push(
+                <span className={this.props.class} style={{ color: color }} ref={this.renderRef} >
+                    {word + " "}
+                </span>
+            )
+        }
+        //console.log("In render() with ", this.props.text.split(" "), " Style: ", this.props.style)
+        //console.log(text)
+        var my_div = (
+            <div style={{ width: this.props.width, height: this.props.height * 2 }} onMouseUp={this.props.onHighlight} >
+
+                {/*}
                 <span className={this.props.class} style={this.props.style} ref={this.renderRef} >
                     {this.props.text}
                 </span>
-            </div>
-        );
+                */}
+                {spans}
+            </div >
+        )
+
+
+
+
+
+        return my_div;
     }
-    static Tokenize (sentence) {
+    static Tokenize(sentence) {
         return sentence.split(/[\s]+/);
     }
-    static Clean(sentence){
+    static Clean(sentence) {
         return Bullet.Tokenize(sentence).join(' ');
     }    // Tweak and Untweak are used to fix some miscellaneous PDF-vs-HTML formatting problems
-    static Tweak(sentence){    
+    static Tweak(sentence) {
         // adds a 0-width space (\u200B) after forward slashes to cause them to wrap
-        sentence =  sentence.replace(/(\w)\//g,'$1/\u200B');
-        
+        sentence = sentence.replace(/(\w)\//g, '$1/\u200B');
+
         // adds a non-breaking dash (\u2011) instead of a dash to prevent wrapping
-        sentence =  sentence.replace(/-/g,'\u2011');
+        sentence = sentence.replace(/-/g, '\u2011');
         return sentence;
     }
-    
-    static Untweak(sentence){
-        sentence =  sentence.replace(/[\u200B]/g,'');
-        sentence =  sentence.replace(/[\u2011]/g,'-');
+
+    static Untweak(sentence) {
+        sentence = sentence.replace(/[\u200B]/g, '');
+        sentence = sentence.replace(/[\u2011]/g, '-');
         return sentence;
     }
     evaluate = () => {
@@ -50,7 +139,7 @@ class Bullet extends React.PureComponent{
         dispNode.style.whiteSpace = "nowrap";
         const parentWidth = dispNode.parentNode.getBoundingClientRect().width;
         const singleWidth = dispNode.getBoundingClientRect().width;
-        
+
         //This checks to see what the single line height of the ref nodeis.
         const singleHeight = dispNode.getBoundingClientRect().height;
         //console.log(singleHeight);
@@ -63,13 +152,13 @@ class Bullet extends React.PureComponent{
         const trueHeight = dispNode.getBoundingClientRect().height;
         //dispNode.style.wordBreak = 'inherit';
         const overflow = (singleWidth - parentWidth);
-    
+
         const madeNewLine = trueHeight > singleHeight;
-        
+
         let results = {
             "optimization": {
                 "sentence": this.props.text,
-                "status":false,
+                "status": false,
             },
             "direction": false,
             "height": trueHeight,
@@ -79,23 +168,23 @@ class Bullet extends React.PureComponent{
         //  just check to see if overflow is greater than or less than 0? You would think so,
         //  but there are cases where the browser will fit a wider element into a smaller one,
         //  WITHOUT wrapping the line... 
-        if(madeNewLine){
+        if (madeNewLine) {
             results.direction = BULLET.REM_SPACE;
-        }else{
+        } else {
             results.direction = BULLET.ADD_SPACE;
         }
 
-        if(overflow > BULLET.MAX_UNDERFLOW && ! madeNewLine){
+        if (overflow > BULLET.MAX_UNDERFLOW && !madeNewLine) {
             results.optimization.status = BULLET.OPTIMIZED;
-        }else {
+        } else {
             results.optimization.status = BULLET.FAILED_OPT;
         }
         return results;
     }
 }
 
-class BulletEditor extends React.PureComponent{
-    constructor(props){
+class BulletEditor extends React.PureComponent {
+    constructor(props) {
         super(props);
         this.ref = React.createRef();
     }
@@ -104,45 +193,45 @@ class BulletEditor extends React.PureComponent{
         this.fixHeight();
     }
     handleInput = (e) => {
-        if(checkEditor) console.log(this.ref)
+        if (checkEditor) console.log(this.ref)
         this.fixHeight();
     }
     fixHeight = () => {
 
         this.ref.current.style.height = 'auto';
         this.ref.current.style.height = Math.max(this.ref.current.scrollHeight, this.props.minHeight) + 'px';
-        if( checkEditor) console.log('input box height adjusted')
+        if (checkEditor) console.log('input box height adjusted')
     }
-    componentDidMount(){
+    componentDidMount() {
         this.fixHeight();
-        if( checkEditor) console.log('text editor mounted')
+        if (checkEditor) console.log('text editor mounted')
     }
-    componentDidUpdate(prevProps){
-        if(checkEditor) console.log('text editor updated')
-        
+    componentDidUpdate(prevProps) {
+        if (checkEditor) console.log('text editor updated')
+
         this.fixHeight();
-        if(this.props.textSelRange.trigger != prevProps.textSelRange.trigger){
-            if(checkThesaurus || checkEditor) console.log('new selection range: ', this.props.textSelRange)
+        if (this.props.textSelRange.trigger != prevProps.textSelRange.trigger) {
+            if (checkThesaurus || checkEditor) console.log('new selection range: ', this.props.textSelRange)
             let start, end;
-            if(this.props.textSelRange.start < this.props.textSelRange.end){
+            if (this.props.textSelRange.start < this.props.textSelRange.end) {
                 start = this.props.textSelRange.start;
                 end = this.props.textSelRange.end;
-            }else{
+            } else {
                 start = this.props.textSelRange.end;
                 end = this.props.textSelRange.start;
             }
             this.ref.current.setSelectionRange(start, end)
         }
-        
+
 
     }
-    render(){
+    render() {
         return (
             <div className="border" >
-                <textarea 
+                <textarea
                     ref={this.ref}
-                    onChange={this.handleChange} 
-                    value={this.props.text} 
+                    onChange={this.handleChange}
+                    value={this.props.text}
                     onInput={this.handleInput}
                     style={{
                         width: this.props.width,
@@ -150,35 +239,35 @@ class BulletEditor extends React.PureComponent{
                     }}
                     onMouseUp={this.props.onHighlight}
                     onKeyUp={this.props.onHighlight}
-                    
+
                     className="bullets textarea is-paddingless is-marginless"></textarea>
             </div>
         )
     }
 }
 //how do i get lines to line up between the output and editor?
-class BulletOutputViewer extends React.PureComponent{
-    constructor(props){
+class BulletOutputViewer extends React.PureComponent {
+    constructor(props) {
         super(props);
         this.outputRef = React.createRef();
         this.state = {
             abbrBullets: this.props.bullets.map(this.props.abbrReplacer)
         };
     }
-    componentDidUpdate(prevProps,prevState){
+    componentDidUpdate(prevProps, prevState) {
         const newAbbrBullets = this.props.bullets.map(this.props.abbrReplacer);
-        if(prevProps.bullets.map(prevProps.abbrReplacer).join('') != newAbbrBullets.join('')){
+        if (prevProps.bullets.map(prevProps.abbrReplacer).join('') != newAbbrBullets.join('')) {
             this.setState({
                 abbrBullets: newAbbrBullets,
             });
         }
     }
-    selectOutput = (e)=>{
-        if(e.ctrlKey && e.keyCode == 65){
+    selectOutput = (e) => {
+        if (e.ctrlKey && e.keyCode == 65) {
             e.preventDefault();
             //clog('control-a')
             //clog(this.outputRef.current)
-            if (window.getSelection) { 
+            if (window.getSelection) {
                 const range = document.createRange();
                 range.selectNode(this.outputRef.current);
                 window.getSelection().removeAllRanges();
@@ -186,83 +275,83 @@ class BulletOutputViewer extends React.PureComponent{
             }
         }
     }
-    handleCopy = (e)=>{
-        
+    handleCopy = (e) => {
+
         let text = Bullet.Untweak(window.getSelection().toString())
         //console.log('Copy event: ' + text)
-        text = text.replace(/\n/g,'\r\n'); //need this for WINDOWS!
+        text = text.replace(/\n/g, '\r\n'); //need this for WINDOWS!
         //console.log('Copy event: ' + text)
-        e.clipboardData.setData('text/plain',text);
+        e.clipboardData.setData('text/plain', text);
         e.preventDefault();
     }
-    render(){
+    render() {
         const keyDict = {};
         return (
-            <div className="border" tabIndex="1" 
-                onKeyDown={this.selectOutput} 
-                onKeyUp={this.props.onHighlight} 
+            <div className="border" tabIndex="1"
+                onKeyDown={this.selectOutput}
+                onKeyUp={this.props.onHighlight}
                 ref={this.outputRef}
                 onCopy={this.handleCopy}>
                 {this.props.bullets.map(
-                (line,i)=>{
-                    const key = this.state.abbrBullets[i] + this.props.width + this.props.enableOptim;
-                    if(checkAbbrs) console.log("key for optim bullet", key, this.props)
-                    if(key in keyDict){
-                        keyDict[key] += 1;
-                    }else{
-                        keyDict[key] = 1;
-                    }
-                    return <HeightAdjustedBullet text={this.state.abbrBullets[i] || ''} 
-                        rawText={line}
-                        width={this.props.width}
-                        key={key + keyDict[key]} 
-                        optims={this.props.optims}
-                        onOptim={this.props.onOptim}
-                        optimizer={this.props.optimizer}
-                        enableOptim={this.props.enableOptim}
-                        onHighlight={this.props.onHighlight}
-                        abbrReplacer = {this.props.abbrReplacer}
+                    (line, i) => {
+                        const key = this.state.abbrBullets[i] + this.props.width + this.props.enableOptim;
+                        if (checkAbbrs) console.log("key for optim bullet", key, this.props)
+                        if (key in keyDict) {
+                            keyDict[key] += 1;
+                        } else {
+                            keyDict[key] = 1;
+                        }
+                        return <HeightAdjustedBullet text={this.state.abbrBullets[i] || ''}
+                            rawText={line}
+                            width={this.props.width}
+                            key={key + keyDict[key]}
+                            optims={this.props.optims}
+                            onOptim={this.props.onOptim}
+                            optimizer={this.props.optimizer}
+                            enableOptim={this.props.enableOptim}
+                            onHighlight={this.props.onHighlight}
+                            abbrReplacer={this.props.abbrReplacer}
                         />
-                })}
+                    })}
             </div>
         )
     }
 
 }
-class HeightAdjustedBullet extends React.PureComponent{
-    constructor(props){
+class HeightAdjustedBullet extends React.PureComponent {
+    constructor(props) {
         super(props);
         this.bulletRef = React.createRef();
         this.state = {
-            checkingHeight : true,
+            checkingHeight: true,
             height: 'unset',
         }
     }
-    componentDidMount(){
-        if(checkOptims) console.log('height adjustment is mounting')
-        if(this.state.checkingHeight){
-            if(checkOptims) console.log('height adjustment after mount: ', this.bulletRef.current)
-            if(checkOptims) console.log('height adjustment evaluated height: ', this.bulletRef.current.evaluate())
+    componentDidMount() {
+        if (checkOptims) console.log('height adjustment is mounting')
+        if (this.state.checkingHeight) {
+            if (checkOptims) console.log('height adjustment after mount: ', this.bulletRef.current)
+            if (checkOptims) console.log('height adjustment evaluated height: ', this.bulletRef.current.evaluate())
             const newHeight = this.bulletRef.current.evaluate().height;
-            const newHeightSetting = newHeight==0? 'inherit':newHeight+'px';
+            const newHeightSetting = newHeight == 0 ? 'inherit' : newHeight + 'px';
             this.setState({
-                height:newHeightSetting,
+                height: newHeightSetting,
                 checkingHeight: false,
             })
-   
+
         }
     }
-    componentDidUpdate(prevProps, prevState){
-        if(checkOptims) console.log('height adjustment updated',prevProps, this.props, prevState,this.state)
-        if(prevProps.rawText != this.props.rawText){
+    componentDidUpdate(prevProps, prevState) {
+        if (checkOptims) console.log('height adjustment updated', prevProps, this.props, prevState, this.state)
+        if (prevProps.rawText != this.props.rawText) {
             this.setState({
                 checkingHeight: true,
             })
-        }else{
-            if(this.state.checkingHeight){
-                if(checkOptims) console.log('new calculated height: ', this.bulletRef.current.evaluate())
+        } else {
+            if (this.state.checkingHeight) {
+                if (checkOptims) console.log('new calculated height: ', this.bulletRef.current.evaluate())
                 const newHeight = this.bulletRef.current.evaluate().height;
-                const newHeightSetting = newHeight==0? 'inherit':newHeight+'px';
+                const newHeightSetting = newHeight == 0 ? 'inherit' : newHeight + 'px';
                 this.setState({
                     checkingHeight: false,
                     height: newHeightSetting,
@@ -270,111 +359,111 @@ class HeightAdjustedBullet extends React.PureComponent{
             }
         }
     }
-    render(){
-            let bullet;
-            if(this.state.checkingHeight){
-                bullet = (
-                    <Bullet text={Bullet.Tweak(this.props.rawText)} 
-                        ref={this.bulletRef}
-                        width={this.props.width} 
-                        onHighlight={this.props.onHighlight}
-                        class='bullets optimized' 
-                        style={{
-                            display:'inline-block',
-                            wordBreak:'break-word',
-                        }}
-                    />
-                )
-            }else{
-                bullet = (
-                    <OptimizedBullet text={this.props.text} 
-                        width={this.props.width}
-                        height={this.state.height} 
-                        optims={this.props.optims}
-                        onOptim={this.props.onOptim}
-                        optimizer={this.props.optimizer}
-                        enableOptim={this.props.enableOptim}
-                        onHighlight={this.props.onHighlight}
-                        abbrReplacer = {this.props.abbrReplacer}
-                        />
-                )
-            }
-            return ( <div>{bullet} </div>);
-        
+    render() {
+        let bullet;
+        if (this.state.checkingHeight) {
+            bullet = (
+                <Bullet text={Bullet.Tweak(this.props.rawText)}
+                    ref={this.bulletRef}
+                    width={this.props.width}
+                    onHighlight={this.props.onHighlight}
+                    class='bullets optimized'
+                    style={{
+                        display: 'inline-block',
+                        wordBreak: 'break-word',
+                    }}
+                />
+            )
+        } else {
+            bullet = (
+                <OptimizedBullet text={this.props.text}
+                    width={this.props.width}
+                    height={this.state.height}
+                    optims={this.props.optims}
+                    onOptim={this.props.onOptim}
+                    optimizer={this.props.optimizer}
+                    enableOptim={this.props.enableOptim}
+                    onHighlight={this.props.onHighlight}
+                    abbrReplacer={this.props.abbrReplacer}
+                />
+            )
+        }
+        return (<div>{bullet} </div>);
+
     }
 }
-class OptimizedBullet extends React.PureComponent{
-    constructor(props){
+class OptimizedBullet extends React.PureComponent {
+    constructor(props) {
         super(props);
         this.state = {
             text: this.props.text,
             loading: true,
             updating: null,
             status: BULLET.NOT_OPT,
-            height:'unset',
+            height: 'unset',
         }
 
-        this.bulletRef=React.createRef();
-        if( false) console.log("constructed: " + this.state.text)
+        this.bulletRef = React.createRef();
+        if (false) console.log("constructed: " + this.state.text)
     }
     optimExists = () => {
-        if(this.props.optims[this.state.text] && this.props.optims[this.state.text][this.props.width]){
+        if (this.props.optims[this.state.text] && this.props.optims[this.state.text][this.props.width]) {
             return true
-        }else{
+        } else {
             return false
         }
     }
     update = () => {
         const sentence = this.state.text;
-        if(!this.props.enableOptim){
-            if( checkOptims) console.log('no optimization done because it is disabled')
+        if (!this.props.enableOptim) {
+            if (checkOptims) console.log('no optimization done because it is disabled')
             this.setState({
                 text: this.props.text,
                 status: BULLET.NOT_OPT,
-                loading:false
+                loading: false
             })
-        }else if(this.optimExists()){
-            if( checkOptims) console.log('optimization already exists for ' + sentence)
-            if(checkOptims) console.log(this.props.optims[sentence][this.props.width])
+        } else if (this.optimExists()) {
+            if (checkOptims) console.log('optimization already exists for ' + sentence)
+            if (checkOptims) console.log(this.props.optims[sentence][this.props.width])
             this.setState({
                 text: this.props.optims[sentence][this.props.width].result,
                 status: this.props.optims[sentence][this.props.width].status,
-                loading:false
+                loading: false
             });
-        
-        }else{
+
+        } else {
             this.setState({
-                loading:true
+                loading: true
             })
-            if( checkOptims) console.log('Optimization loading for ' + sentence)
+            if (checkOptims) console.log('Optimization loading for ' + sentence)
             this.bufferedOptimize(500);
         }
     }
-   
-    bufferedOptimize = (delay) => { 
-        if(this.state.updating && this.state.loading){
+
+    bufferedOptimize = (delay) => {
+        if (this.state.updating && this.state.loading) {
             clearTimeout(this.state.updating)
         }
         this.setState({
-            updating: setTimeout(()=>{
+            updating: setTimeout(() => {
                 this.optimize();
                 this.setState({
-                    updating:null,
-                    loading:false,
+                    updating: null,
+                    loading: false,
                 });
             }, delay),
         })
     }
-    bufferedUpdate = (delay) => { 
-        if(this.state.updating){
+    bufferedUpdate = (delay) => {
+        if (this.state.updating) {
             clearTimeout(this.state.updating)
         }
         this.setState({
-            updating: setTimeout(()=>{
+            updating: setTimeout(() => {
                 this.update();
                 this.setState({
-                    updating:null,
-                    loading:false,
+                    updating: null,
+                    loading: false,
                 });
             }, delay),
         })
@@ -385,7 +474,7 @@ class OptimizedBullet extends React.PureComponent{
         return this.optimizer().then((optimization) => {
             // send optim back to global dictionary to update it
             this.props.onOptim({
-                "sentence":sentence,
+                "sentence": sentence,
                 "width": this.props.width,
                 "optimized": optimization.sentence,
                 "status": optimization.status,
@@ -393,65 +482,65 @@ class OptimizedBullet extends React.PureComponent{
             return optimization;
         }).then((optimization) => {
             this.setState({
-                text:optimization.sentence,
+                text: optimization.sentence,
                 status: optimization.status,
-                loading:false,
+                loading: false,
             })
-        }).then(()=>{if(checkOptims) console.log("optimization finished")})
-        
+        }).then(() => { if (checkOptims) console.log("optimization finished") })
+
     }
-    optimizer = () =>{
-        return new Promise((res)=>{
+    optimizer = () => {
+        return new Promise((res) => {
             //clog(ref)
             //clog(this.evaluate(bullet))
             const bulletRef = this.bulletRef.current;
-            if(bulletRef == null) return;
+            if (bulletRef == null) return;
             const smallerSpace = "\u2006";
             const largerSpace = "\u2004";
 
-            const origSentence = 
+            const origSentence =
                 Bullet.Clean(
-                    this.props.text 
+                    this.props.text
                 )
 
             //initialization of optimized words array
             let optWords = Bullet.Tokenize(origSentence);
-            
+
             const initResults = bulletRef.evaluate();
             this.setState({
                 text: origSentence
             })
-            
-            
-            
+
+
+
             //initial instantiation of previousResults
             let prevResults = initResults;
             let finalResults = initResults;
-            const newSpace = (initResults.direction == BULLET.ADD_SPACE)? largerSpace: smallerSpace;
-            
-            if( checkOptims) console.log('Sentence: ' + origSentence, initResults)
-        
-            function getRandomInt(seed,max){
-                return Math.floor( Math.abs((Math.floor(9*seed.hashCode()+5) % 100000) / 100000) * Math.floor(max));
+            const newSpace = (initResults.direction == BULLET.ADD_SPACE) ? largerSpace : smallerSpace;
+
+            if (checkOptims) console.log('Sentence: ' + origSentence, initResults)
+
+            function getRandomInt(seed, max) {
+                return Math.floor(Math.abs((Math.floor(9 * seed.hashCode() + 5) % 100000) / 100000) * Math.floor(max));
             }
-            
+
 
             //if the sentence is blank, do nothing.
-            if(! origSentence.trim()){
+            if (!origSentence.trim()) {
                 finalResults.optimization.status = BULLET.OPTIMIZED;
-            } else{
+            } else {
 
-                while(finalResults.optimization.status != BULLET.OPTIMIZED){
+                while (finalResults.optimization.status != BULLET.OPTIMIZED) {
                     //don't select the first space after the dash- that would be noticeable and look wierd.
                     // also don't select the last word, don't want to add a space after that.
-                    let iReplace = getRandomInt(optWords.join(''), optWords.length -1 -1) + 1;
-                    
+                    let iReplace = getRandomInt(optWords.join(''), optWords.length - 1 - 1) + 1;
+
                     //merges two elements together, joined by the space
-                    optWords.splice( 
-                        iReplace, 2, 
-                        optWords.slice(iReplace,iReplace+2).join(newSpace)
+                    optWords.splice(
+                        iReplace, 2,
+                        optWords.slice(iReplace, iReplace + 2).join(newSpace)
                     );
-            
+
                     //make all other spaces the normal space size
                     let newSentence = optWords.join(' ');
                     this.setState({
@@ -460,83 +549,163 @@ class OptimizedBullet extends React.PureComponent{
                     // check to see how sentence fits
                     let newResults = bulletRef.evaluate();
                     //console.log(newResults)
-                    if(initResults.direction == BULLET.ADD_SPACE && newResults.direction == BULLET.REM_SPACE){            
+                    if (initResults.direction == BULLET.ADD_SPACE && newResults.direction == BULLET.REM_SPACE) {
                         //console.log("Note: Can't add more spaces without overflow, reverting to previous" );
                         finalResults.optimization = prevResults.optimization;
                         break;
-                    } else if(initResults.direction == BULLET.REM_SPACE && newResults.direction == BULLET.ADD_SPACE){
+                    } else if (initResults.direction == BULLET.REM_SPACE && newResults.direction == BULLET.ADD_SPACE) {
                         //console.log("Removed enough spaces. Terminating." );
                         finalResults.optimization = newResults.optimization;
                         break;
-                    } else if(optWords.length <= 2){ //this conditional needs to be last
+                    } else if (optWords.length <= 2) { //this conditional needs to be last
                         //console.log("\tWarning: Can't replace any more spaces");
                         finalResults.optimization = newResults.optimization;
                         break;
                     }
                     prevResults = newResults;
-                } 
-            } 
+                }
+            }
 
             res(finalResults.optimization)
         })
     };
-    componentDidUpdate(prevProps){
-        if(checkOptims) {
+    componentDidUpdate(prevProps) {
+        if (checkOptims) {
             console.log('component updated. previous: ' + prevProps.text)
             console.log('to ' + this.props.text)
         }
     }
-    componentDidMount(){
-        if( checkOptims) console.log('component mounted for ' + this.state.text)
-        if( false) console.log(this.state)
+    componentDidMount() {
+        if (checkOptims) console.log('component mounted for ' + this.state.text)
+        if (false) console.log(this.state)
         this.update();
-        this.setState({height: this.props.height})
+        this.setState({ height: this.props.height })
 
     }
-    
-    componentWillUnmount(){
-        if( checkOptims) console.log('component unmounted ')
+
+    componentWillUnmount() {
+        if (checkOptims) console.log('component unmounted ')
         clearTimeout(this.state.updating)
     }
 
-    render(){
-        if( checkOptims) console.log('component rendering: ', escape(this.state.text))
+    render() {
+        if (checkOptims) console.log('component rendering: ', escape(this.state.text))
         let newColor = "inherit";
-   
-        if(this.state.loading){
+
+        if (this.state.loading) {
             newColor = "gray"
-        }else if(this.state.status == BULLET.FAILED_OPT){
+        } else if (this.state.status == BULLET.FAILED_OPT) {
             newColor = "red"
         }
-        
+
+        //console.log("Hello from bullet", this.state.text)
 
         return (
-            <Bullet text={Bullet.Tweak(this.state.text)} 
+            <Bullet text={Bullet.Tweak(this.state.text)}
                 ref={this.bulletRef}
-                width={this.props.width} 
+                width={this.props.width}
                 onHighlight={this.props.onHighlight}
-                class='bullets optimized' 
+                class='bullets optimized'
                 style={{
                     color: newColor,
-                    display:'inline-block',
-                    wordBreak:'break-word',
+                    display: 'inline-block',
+                    wordBreak: 'break-word',
                 }}
-                height={this.state.height}/>
+                height={this.state.height} />
         )
     }
 
 }
-class BulletComparator extends React.PureComponent {
-    constructor(props){
+
+class Notes extends React.PureComponent {
+    constructor(props) {
         super(props);
-        
-        this.state = { 
+        this.ref = React.createRef();
+    }
+    handleChange = (e) => {
+        this.props.handleTextChange(e)
+        this.fixHeight();
+    }
+    handleInput = (e) => {
+        if (checkEditor) console.log(this.ref)
+        this.fixHeight();
+    }
+    fixHeight = () => {
+
+        this.ref.current.style.height = 'auto';
+        this.ref.current.style.height = Math.max(this.ref.current.scrollHeight, this.props.minHeight) + 'px';
+        if (checkEditor) console.log('input box height adjusted')
+    }
+    componentDidMount() {
+        this.fixHeight();
+        if (checkEditor) console.log('text editor mounted')
+    }
+    componentDidUpdate(prevProps) {
+        if (checkEditor) console.log('text editor updated')
+
+        this.fixHeight();
+        if (this.props.textSelRange.trigger != prevProps.textSelRange.trigger) {
+            if (checkThesaurus || checkEditor) console.log('new selection range: ', this.props.textSelRange)
+            let start, end;
+            if (this.props.textSelRange.start < this.props.textSelRange.end) {
+                start = this.props.textSelRange.start;
+                end = this.props.textSelRange.end;
+            } else {
+                start = this.props.textSelRange.end;
+                end = this.props.textSelRange.start;
+            }
+            this.ref.current.setSelectionRange(start, end)
+        }
+
+
+    }
+    render() {
+        var test = "hello word"
+        var rendered_notes = []
+        var item = ""
+        var pop_freq = ""
+        var pop_word = ""
+        var freq_threshold = 2
+        update_popular_words(word_freq, freq_threshold)
+        if (popular_words_and_counts.length > 1) {
+            for (item of popular_words_and_counts) {
+                pop_word = item[0]
+                pop_freq = item[1]
+                rendered_notes.push(pop_word.toString() + " appears " + pop_freq.toString() + " times\n")
+            }
+        }
+        console.log(rendered_notes)
+        return (
+            <div className="border" >
+                <textarea
+                    ref={this.ref}
+                    onChange={this.handleChange}
+                    value={rendered_notes.toString()}
+                    onInput={this.handleInput}
+                    style={{
+                        width: this.props.width,
+                        maxHeight: "unset",
+                    }}
+                    onMouseUp={this.props.onHighlight}
+                    onKeyUp={this.props.onHighlight}
+
+                    className="bullets textarea is-paddingless is-marginless"></textarea>
+            </div>
+        )
+    }
+}
+
+class BulletComparator extends React.PureComponent {
+    constructor(props) {
+        super(props);
+
+        this.state = {
             enableOptim: true,
             optims: {}
         };
 
     }
-    
+
     updateOptims = (params) => {
         this.setState((state) => {
             state.optims[params.sentence] = state.optims[params.sentence] || {};
@@ -553,44 +722,55 @@ class BulletComparator extends React.PureComponent {
             text: e.target.value,
         });
     }
-    handleSelect = (e) =>{
-        if( false) console.log('selection registered in reactBullets')
+    handleSelect = (e) => {
+        if (false) console.log('selection registered in reactBullets')
         const selection = window.getSelection().toString();
-        if(selection != ""){
+        if (selection != "") {
             this.props.onSelect(selection);
-        }else if(e.target.selectionStart){
+        } else if (e.target.selectionStart) {
             //this hack is for microsoft edge, which sucks at window.getSelection()
             const textAreaSelection = e.target.value.substring(e.target.selectionStart, e.target.selectionEnd);
-            if( false) console.log("selection: " + textAreaSelection);
+            if (false) console.log("selection: " + textAreaSelection);
             this.props.onSelect(textAreaSelection);
         }
     }
     render() {
-        if( checkOptims) console.log('rendering bullet comparator')
-        if( checkOptims) console.log(this.state)
-        if( checkOptims) console.log(this.props)
+        if (checkOptims) console.log('rendering bullet comparator')
+        if (checkOptims) console.log(this.state)
+        if (checkOptims) console.log(this.props)
+
         return (
-            <div className="columns is-multiline">
+            <div className="columns is-multiline" >
                 <div className="column is-narrow">
-                <h2 className='subtitle'>Input Bullets Here:</h2>
-                <BulletEditor 
-                    textSelRange={this.props.textSelRange}
-                    text={this.props.text} 
-                    handleTextChange={this.props.handleTextChange} 
-                    width={this.props.width}
-                    onHighlight={this.handleSelect}
-                    minHeight={100}/>
+                    <h2 className='subtitle'>Input Bullets Here:</h2>
+                    <BulletEditor
+                        textSelRange={this.props.textSelRange}
+                        text={this.props.text}
+                        handleTextChange={this.props.handleTextChange}
+                        width={this.props.width}
+                        onHighlight={this.handleSelect}
+                        minHeight={100} />
                 </div>
                 <div className="column is-narrow">
-                <h2 className='subtitle'>View Output Here:</h2>
-                <BulletOutputViewer bullets={this.props.text.split('\n')} 
-                    abbrReplacer={this.props.abbrReplacer}
-                    width={this.props.width} 
-                    optims={this.state.optims} 
-                    enableOptim={this.props.enableOptim} 
-                    optimizer={this.optimizer}
-                    onOptim={this.updateOptims}
-                    onHighlight={this.handleSelect}/>
+                    <h2 className='subtitle'>View Output Here:</h2>
+                    <BulletOutputViewer bullets={this.props.text.split('\n')}
+                        abbrReplacer={this.props.abbrReplacer}
+                        width={this.props.width}
+                        optims={this.state.optims}
+                        enableOptim={this.props.enableOptim}
+                        optimizer={this.optimizer}
+                        onOptim={this.updateOptims}
+                        onHighlight={this.handleSelect} />
+                </div>
+                <div className="column is-narrow">
+                    <h2 className='subtitle'>Notes:</h2>
+                    <Notes
+                        textSelRange={this.props.textSelRange}
+                        text={notes.toString()}
+                        //handleTextChange={this.props.handleTextChange}
+                        width={this.props.width}
+                        onHighlight={this.handleSelect}
+                        minHeight={100} />
                 </div>
             </div>
         );
